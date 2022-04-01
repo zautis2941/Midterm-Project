@@ -1,0 +1,254 @@
+---
+title: "STAT 345 Midterm Project"
+font: 12pt
+date: "Due April 1"
+output:
+  pdf_document: default
+  word_document: default
+  html_document: default
+---
+
+> "Our offense is like the Pythagorean Theorem. There is no answer!", _Shaquille O'Neal_
+
+
+## The Background
+
+Your role for the midterm project is that of data analyst intern at an NBA (professional basketball) team. Your direct supervisor (also part of the analytics team) has asked you to create a data visualization to illustrate how (or if) the team's shots have changed over time. After some initial clarifying questions, your supervisor confessed that they had seen some pretty cool shot charts at http://savvastjortjoglou.com/nba-shot-sharts.html and would like to extend the ideas a bit. 
+
+Your data for the midterm project may come from a variety of sources, including the NBA directly, as well as Basketball-Reference, HoopsHype, and others. There are several ways to access the data, but perhaps the simplest is through the `nbastatR` package, which serves as a wrapper (or set of helper functions) for these various data sources. There is a lot of potentially useful information that can be found using this package; unfortunately, the documentation is somewhat inconsistent. For example, the documentation at https://www.rdocumentation.org/packages/nbastatR/versions/0.1.110202031 is pretty well-formatted and easy to navigate, but the current function names have changed a bit (see `?nbastatR` and click "Index"). 
+
+```{r}
+library(devtools)
+library(nbastatR)
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+library(purrr)
+library(hexbin)
+library(rayshader)
+library(magick)
+library(gridExtra)
+library(BasketballAnalyzeR)
+```
+
+
+
+## 1. Graphic
+    
+
+```{r}
+##### SETTING UP DATA #####
+Sys.setenv("VROOM_CONNECTION_SIZE" = 131072 * 2)
+shots_1997 <- teams_shots(teams="Minnesota Timberwolves", seasons = 1997)
+shots_2000 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2000)
+shots_2005 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2005)
+shots_2010 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2010)
+shots_2015 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2015)
+shots_2020 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2020)
+
+
+earlyShots <- rbind(shots_1997, shots_2000) %>%
+  select(yearSeason, nameTeam, locationX, locationY, typeShot, isShotMade) %>% mutate(isShotMade=as.numeric(isShotMade))
+
+midShots <- rbind(shots_2005, shots_2010) %>%
+  select(yearSeason, nameTeam, locationX, locationY, typeShot, isShotMade) %>% mutate(isShotMade=as.numeric(isShotMade))
+
+recentShots <- rbind(shots_2015, shots_2020) %>%
+  select(yearSeason, nameTeam, locationX, locationY, typeShot, isShotMade) %>% mutate(isShotMade=as.numeric(isShotMade))
+
+
+allShots <- rbind(earlyShots, midShots, recentShots)
+
+``` 
+
+
+
+```{r}
+##### EARLY SHOTS #####
+
+b <- ggplot(data = earlyShots, aes(x = locationX, y = locationY, z = isShotMade))
+
+c <- b + stat_summary_hex()+
+        scale_color_viridis_c(alpha = .1, option = "C") +
+        xlab("Location X") + 
+        ylab("Location Y") +
+        ggtitle("Mean of Shots Made in 1997 & 2000")
+
+  
+c
+
+d <- plot_gg(c, width = 4, height = 4, scale = 300, multicore = TRUE)
+
+##### MID SHOTS #####
+
+b2 <- ggplot(midShots, aes(x = locationX, y = locationY, z = isShotMade))
+
+c2 <- b2 + stat_summary_hex()+
+        scale_color_viridis_c(alpha = .1, option = "C") +
+        xlab("Location X") + 
+        ylab("Location Y") +
+        ggtitle("Mean of Shots Made in 2005 & 2010")
+c2
+
+d2 <- plot_gg(c2, width = 4, height = 4, scale = 300, multicore = TRUE)
+
+##### RECENT SHOTS #####
+
+b3 <- ggplot(recentShots, aes(x = locationX, y = locationY, z = isShotMade))
+
+c3 <- b3 + stat_summary_hex()+
+        scale_color_viridis_c(alpha = .1, option = "C") +
+        xlab("Location X") + 
+        ylab("Location Y") +
+        ggtitle("Mean of Shots Made in 2015 & 2020")
+c3
+
+d3 <- plot_gg(c3, width = 4, height = 4, scale = 300, multicore = TRUE)
+
+##### ALL SHOTS #####
+
+b4 <- ggplot(allShots, aes(x = locationX, y = locationY, z = isShotMade))
+
+c4 <- b4 + stat_summary_hex()+
+        scale_color_viridis_c(alpha = .1, option = "C") +
+        xlab("Location X") + 
+        ylab("Location Y") +
+        ggtitle("Mean of Shots Made by Location Between 1997 & 2020")+
+        facet_wrap(~yearSeason, nrow=2)
+c4
+
+d4 <- plot_gg(c4, width = 4, height = 4, scale = 300, multicore = TRUE)
+d4
+
+```
+
+
+## 2. Summary
+   
+    * the lighter the shade of blue the higher the probability someone in that bin/hexagon made a basket (easier to see on the 3D graph)
+    * looking up the area of the 3pt line, the bulk of the data is within it
+    *X and Y represent a tenth of a foot (1.2 inches)
+    * in general, between the span of 23 years, the data stays relatively the same
+    * if someone is past y = 250 (about 25ft away), then the probability of someone making a basket is very slim
+    * if someone is between 0 <= y <= 250 (between 0 and 25 ft away from the hoop length wise), then the data varies greatly
+    *Location X has less variability and doesn't vary as much as Location Y
+    * bins past +-200 = x, there are a few more low probability bins, but, much less than bins past y >= 250
+    
+   #Explanation 
+   
+  * if someone is between 0 <= y <= 250, then the data varies greatly
+    * the probability in this area in 2020 appears to be the highest than previous years
+      * it (2020) also appears to have the most bins with high probabilities (>.8)
+      * however it also has more bins between 0 and 25 ft with very low probabilities (<.25)
+      * there's a lot of bins that have a probability under .25 between (-200, 0) and (-175,0) 
+    * the probability in 2015 between 0 and 25ft is appears to be the lowest compared to the other years
+    * 2000 and 2010 has look like they have the most consistent data
+  * bins past +-200 = x, there are a few more low probability bins, but, much less than bins past y >= 250. If I were to continue this project, I'd test to see if the number is significant
+
+
+## 3. Commented Code
+```{r}
+shots_1997 <- teams_shots(teams="Minnesota Timberwolves", seasons = 1997)
+shots_2000 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2000)
+shots_2005 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2005)
+shots_2010 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2010)
+shots_2015 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2015)
+shots_2020 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2020)
+#take a team and a season they played and store it as a name
+
+allShots <- rbind(shots_1997, shots_2000, shots_2005, shots_2010, shots_2015, shots_2020)  %>% select(yearSeason, nameTeam, locationX, locationY, typeShot, isShotMade) %>% mutate(isShotMade=as.numeric(isShotMade))
+#set a variable as a merge of the years you used by row binding
+#only take the yearSeason, nameTeam, locationX, locationY, typeShot, isShotMade
+#change isShotMade into a numeric (TRUE = 1 FALSE = 0)
+
+#I changed my code to only include allShots because that's all I display in my graphic
+```
+
+
+```{r}
+b4 <- ggplot(allShots, aes(x = locationX, y = locationY, z = isShotMade))
+  #store your combined dataframe as ggplot with x as the locationX, y as locationY, and     z/density/what will be the mean of each bin as isShotMade
+
+c4 <- b4 + stat_summary_hex()+
+  #have your ggplot add stat_summary_hex which gives a bit more variation to what you can do in comparison to geom_hex, one can change the function, and mine is taking the mean of z and scaling each bin by the probability
+  
+  #before I had fun = function(z) mean(z) because I thought I needed it, but I learned that it isn't needed
+  
+          scale_color_viridis_c(alpha = .1, option = "C") +
+            #makes it a scaled color maps, alpha affects the transparency, and option C indicates which colormap to use
+        xlab("Location X") + 
+          #changes x axis name
+        ylab("Location Y") +
+          #changes y axis name     
+        ggtitle("Mean of Shots Made by Location Between 1997 & 2020")+
+          #changes the title of graphs
+        facet_wrap(~yearSeason, nrow=2)
+          #makes multiple different graphs based on yearSeason and puts them side. nrow=2 means that there will be 2 rows
+#store all of this as a variable for the next part
+
+#Between ggtitle and facet_wrap, I tried to add a court but I would get the same error "Error in `[.tbl_df`(data, , x) : object 'locationX' not found" since I became short on time, I stopped to focus on other parts of the project. Even though it'll be past the due date, I may mess around with it a bit more to try to get the court added (see last Rcode chunk for a few things I tried)
+
+c4
+#print out the 2D version of it
+
+d4 <- plot_gg(c4, width = 5, height = 5, scale = 300, multicore = TRUE)
+#take our 2D plot and make it into a 3D plot. The width and height are of the ggplot in units, the scale changes how tall the transformation will be, multicore = TRUE adds a shadow
+d4
+#print out the 3D transformation
+
+```
+
+since type had density-hexbin, I thought it could graph it the same way it did stat_summary_hex
+
+  b5 <- shotchart(allShots, x="locationX", y = "locationY", z = "isShotMade", type = density-hexbin)
+  c5 <- b4 + b5
+  #Error in density - hexbin : non-numeric argument to binary operator
+
+... was everything above ggtitle and the rest was trying at add a court with rNBA
+court_coor <- courtOutlinePlot
+court <- geom_line(data=court_coor, aes(x = x, y = y, z = isShotMade))
+
+...ggtitle("Mean of Shots Made in 1997 & 2000")+
+geom_line(data=court_coor, aes(x = x, y = y, z = isShotMade))
+  #I did a mix between adding geom_line and court and both gave back "isShotMade not found"
+
+   
+## 4. Extra
+   
+```{r}
+
+extraAllShots <- rbind(shots_1997, shots_2000, shots_2005, shots_2010, shots_2015, shots_2020)  %>% select(yearSeason, nameTeam, locationX, locationY, typeShot, secondsRemaining, isShotMade) %>% mutate(isShotMade=as.numeric(isShotMade))
+
+```
+
+```{r}
+
+b5 <- ggplot(extraAllShots, aes(x = locationX, y = locationY, z = secondsRemaining))
+
+c5 <- b5 + stat_summary_hex()+
+        scale_color_viridis_c(alpha = .1, option = "C") +
+        xlab("Location X") + 
+        ylab("Location Y") +
+        ggtitle("Mean of Seconds Remaining by Location Between 1997 & 2020")+
+        facet_wrap(~yearSeason, nrow=2)
+c5
+```
+
+
+# Summary
+  * Bins beyond y = 250 (beyond 25ft or behind the 3-point line) are shot with little time left
+  * this idea makes sense since we see teams try to make one more shot from far away before the clock runs out of time
+  * inside the 2-point line range, the data appears to vary more
+    * majority looks like it's in between 20 and 45 seconds remaining
+  * 2020 again appears to have the most bins with a higher value (more >50 seconds remaining)
+  
+## The Deliverables
+
+1. Upload your report and code file(s) to GitHub by 11:59am (noon) on Friday, April 1.
+2. Submit your report, code, and link to your GitHub repository by 11:59am (noon) on Friday, April 1.
+  
+  
+  
+  
+
+
